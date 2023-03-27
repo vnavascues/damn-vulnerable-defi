@@ -22,6 +22,7 @@ contract SideEntranceLenderPool {
 
     function deposit() external payable {
         unchecked {
+            // @audit-ok allegedly safe in this exercise, it can't overflow.
             balances[msg.sender] += msg.value;
         }
         emit Deposit(msg.sender, msg.value);
@@ -29,7 +30,7 @@ contract SideEntranceLenderPool {
 
     function withdraw() external {
         uint256 amount = balances[msg.sender];
-        
+
         delete balances[msg.sender];
         emit Withdraw(msg.sender, amount);
 
@@ -41,7 +42,16 @@ contract SideEntranceLenderPool {
 
         IFlashLoanEtherReceiver(msg.sender).execute{value: amount}();
 
-        if (address(this).balance < balanceBefore)
-            revert RepayFailed();
+        // @audit ETH balance check based on `address(this).balance` is a well known bug-prone/attack vector.
+        // @audit this invariant will pass as long as the contract holds the balance; no matter to which `balances`
+        // key(s) (address or addresses) belong.
+        // @audit exploit (cross-function reentrancy):
+        // 1. The attacker (of type `IFlashLoanEtherReceiver`) is a payable smart contract that calls
+        // `address(this).flashLoan(address(this).balance)` (p.ej. `exploit()`)
+        // 2. The attacker must implement too `execute()`, which is a payable function that calls
+        // `address(this).deposit()` (cross-function reentrancy). This sets the attacker `balances` with all the ETH
+        // borrowed, which is invariant-compliant.
+        // 3. The attacker exploit can withdraw the funds after the flash loan by calling `address(this).withdraw()`.
+        if (address(this).balance < balanceBefore) revert RepayFailed();
     }
 }
