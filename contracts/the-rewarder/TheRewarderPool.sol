@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import "solady/src/utils/FixedPointMathLib.sol";
 import "solady/src/utils/SafeTransferLib.sol";
-import { RewardToken } from "./RewardToken.sol";
-import { AccountingToken } from "./AccountingToken.sol";
+import {RewardToken} from "./RewardToken.sol";
+import {AccountingToken} from "./AccountingToken.sol";
 
 /**
  * @title TheRewarderPool
@@ -15,7 +15,7 @@ contract TheRewarderPool {
 
     // Minimum duration of each round of rewards in seconds
     uint256 private constant REWARDS_ROUND_MIN_DURATION = 5 days;
-    
+
     uint256 public constant REWARDS = 100 ether;
 
     // Token deposited into the pool by users
@@ -65,18 +65,32 @@ contract TheRewarderPool {
         );
     }
 
+    // @audit it does not deal with the rewards distribution logic, creating an asymmetry of consequences between
+    // `deposit()` and `withdraw()`.
+    // @audit exploit:
+    // 1. The attacker is a contract that calls and receives the flash loan.
+    // 2. The attacker exploit borrows DVTs, deposit them here (forcing the pool to take the snapshot) and finally
+    // withdraws them to repay the loan. Optionally, the attacker can transfer the minted RWT to the signer (`owner()`)
+    // before repaying the flash loan.
     function withdraw(uint256 amount) external {
         accountingToken.burn(msg.sender, amount);
         SafeTransferLib.safeTransfer(liquidityToken, msg.sender, amount);
     }
 
+    // @audit goal is to take a snapshot with increased `amountDeposited` and/or decrease `totalDeposits` to end up
+    // getting bigger rewards
     function distributeRewards() public returns (uint256 rewards) {
         if (isNewRewardsRound()) {
             _recordSnapshot();
         }
 
-        uint256 totalDeposits = accountingToken.totalSupplyAt(lastSnapshotIdForRewards);
-        uint256 amountDeposited = accountingToken.balanceOfAt(msg.sender, lastSnapshotIdForRewards);
+        uint256 totalDeposits = accountingToken.totalSupplyAt(
+            lastSnapshotIdForRewards
+        );
+        uint256 amountDeposited = accountingToken.balanceOfAt(
+            msg.sender,
+            lastSnapshotIdForRewards
+        );
 
         if (amountDeposited > 0 && totalDeposits > 0) {
             rewards = amountDeposited.mulDiv(REWARDS, totalDeposits);
@@ -96,13 +110,16 @@ contract TheRewarderPool {
     }
 
     function _hasRetrievedReward(address account) private view returns (bool) {
-        return (
-            lastRewardTimestamps[account] >= lastRecordedSnapshotTimestamp
-                && lastRewardTimestamps[account] <= lastRecordedSnapshotTimestamp + REWARDS_ROUND_MIN_DURATION
-        );
+        return (lastRewardTimestamps[account] >=
+            lastRecordedSnapshotTimestamp &&
+            lastRewardTimestamps[account] <=
+            lastRecordedSnapshotTimestamp + REWARDS_ROUND_MIN_DURATION);
     }
 
+    // @audit check operation is cast safe
     function isNewRewardsRound() public view returns (bool) {
-        return block.timestamp >= lastRecordedSnapshotTimestamp + REWARDS_ROUND_MIN_DURATION;
+        return
+            block.timestamp >=
+            lastRecordedSnapshotTimestamp + REWARDS_ROUND_MIN_DURATION;
     }
 }
