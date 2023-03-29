@@ -2,14 +2,13 @@
 pragma solidity ^0.8.0;
 
 import "../DamnValuableTokenSnapshot.sol";
-import "./ISimpleGovernance.sol"
-;
+import "./ISimpleGovernance.sol";
+
 /**
  * @title SimpleGovernance
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
  */
 contract SimpleGovernance is ISimpleGovernance {
-
     uint256 private constant ACTION_DELAY_IN_SECONDS = 2 days;
     DamnValuableTokenSnapshot private _governanceToken;
     uint256 private _actionCounter;
@@ -20,13 +19,17 @@ contract SimpleGovernance is ISimpleGovernance {
         _actionCounter = 1;
     }
 
-    function queueAction(address target, uint128 value, bytes calldata data) external returns (uint256 actionId) {
-        if (!_hasEnoughVotes(msg.sender))
-            revert NotEnoughVotes(msg.sender);
+    // @audit notice: queuing an action requires to pass `hasEnoughVotes()`, which potentially
+    // can be bypassed borrowing DVTs & taking the snapshot via flash loan.
+    function queueAction(
+        address target,
+        uint128 value,
+        bytes calldata data
+    ) external returns (uint256 actionId) {
+        if (!_hasEnoughVotes(msg.sender)) revert NotEnoughVotes(msg.sender);
 
-        if (target == address(this))
-            revert InvalidTarget();
-        
+        if (target == address(this)) revert InvalidTarget();
+
         if (data.length > 0 && target.code.length == 0)
             revert TargetMustHaveCode();
 
@@ -40,21 +43,29 @@ contract SimpleGovernance is ISimpleGovernance {
             data: data
         });
 
-        unchecked { _actionCounter++; }
+        unchecked {
+            _actionCounter++;
+        }
 
         emit ActionQueued(actionId, msg.sender);
     }
 
-    function executeAction(uint256 actionId) external payable returns (bytes memory) {
-        if(!_canBeExecuted(actionId))
-            revert CannotExecute(actionId);
+    // @audit notice: executing an action requires to pass `_canBeExecuted()`, which requires to call this method
+    // 2 days after the action was queued.
+    // @audit notice: this method is the only one capable of calling `SelfiePool.emergencyExit()`.
+    function executeAction(
+        uint256 actionId
+    ) external payable returns (bytes memory) {
+        if (!_canBeExecuted(actionId)) revert CannotExecute(actionId);
 
         GovernanceAction storage actionToExecute = _actions[actionId];
         actionToExecute.executedAt = uint64(block.timestamp);
 
         emit ActionExecuted(actionId, msg.sender);
 
-        (bool success, bytes memory returndata) = actionToExecute.target.call{value: actionToExecute.value}(actionToExecute.data);
+        (bool success, bytes memory returndata) = actionToExecute.target.call{
+            value: actionToExecute.value
+        }(actionToExecute.data);
         if (!success) {
             if (returndata.length > 0) {
                 assembly {
@@ -76,7 +87,9 @@ contract SimpleGovernance is ISimpleGovernance {
         return address(_governanceToken);
     }
 
-    function getAction(uint256 actionId) external view returns (GovernanceAction memory) {
+    function getAction(
+        uint256 actionId
+    ) external view returns (GovernanceAction memory) {
         return _actions[actionId];
     }
 
@@ -91,21 +104,25 @@ contract SimpleGovernance is ISimpleGovernance {
      */
     function _canBeExecuted(uint256 actionId) private view returns (bool) {
         GovernanceAction memory actionToExecute = _actions[actionId];
-        
-        if (actionToExecute.proposedAt == 0) // early exit
+
+        if (actionToExecute.proposedAt == 0)
+            // early exit
             return false;
 
         uint64 timeDelta;
+        // @audit check under which conditions the undeflow happens
         unchecked {
             timeDelta = uint64(block.timestamp) - actionToExecute.proposedAt;
         }
-
-        return actionToExecute.executedAt == 0 && timeDelta >= ACTION_DELAY_IN_SECONDS;
+        return
+            actionToExecute.executedAt == 0 &&
+            timeDelta >= ACTION_DELAY_IN_SECONDS;
     }
 
     function _hasEnoughVotes(address who) private view returns (bool) {
         uint256 balance = _governanceToken.getBalanceAtLastSnapshot(who);
-        uint256 halfTotalSupply = _governanceToken.getTotalSupplyAtLastSnapshot() / 2;
+        uint256 halfTotalSupply = _governanceToken
+            .getTotalSupplyAtLastSnapshot() / 2;
         return balance > halfTotalSupply;
     }
 }
