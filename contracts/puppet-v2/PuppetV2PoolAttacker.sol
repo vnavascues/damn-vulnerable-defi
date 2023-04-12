@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {WETH} from "solmate/src/tokens/WETH.sol";
-
 import {IDamnValuableToken} from "./IDamnValuableToken.sol";
 import {IPuppetV2Pool} from "./IPuppetV2Pool.sol";
 import {IUniswapV2Router02} from "./IUniswapV2Router02.sol";
+import {IWETH} from "./IWETH.sol";
 
 contract PuppetV2PoolAttacker {
     error SendEthFailed();
@@ -21,7 +20,7 @@ contract PuppetV2PoolAttacker {
     ) payable {
         // 1. Initialise recurrent interfaces
         IPuppetV2Pool puppetPool = IPuppetV2Pool(_puppetPool);
-        WETH weth = WETH(_weth);
+        IWETH weth = IWETH(_weth);
         IDamnValuableToken dvt = IDamnValuableToken(_dvt);
         IUniswapV2Router02 uniRouter = IUniswapV2Router02(_uniRouter);
 
