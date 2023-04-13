@@ -144,6 +144,9 @@ describe("[Challenge] Free Rider", function () {
     // NB: due to deploying `viaIR` is enabled, some reverting reasons may not be well displayed
     // during testing due to https://github.com/NomicFoundation/hardhat/issues/2724
     await attacker.connect(player).exploit(NFT_PRICE, tokenIds);
+
+    // NB: make sure all the marketplace funds are stolen to pass this challenge with a grade
+    expect(await ethers.provider.getBalance(marketplace.address)).to.be.eq(0);
   });
 
   after(async function () {

