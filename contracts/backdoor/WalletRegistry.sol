@@ -49,7 +49,7 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
         walletFactory = walletFactoryAddress;
         token = IERC20(tokenAddress);
 
-        for (uint256 i = 0; i < initialBeneficiaries.length;) {
+        for (uint256 i = 0; i < initialBeneficiaries.length; ) {
             unchecked {
                 beneficiaries[initialBeneficiaries[i]] = true;
                 ++i;
@@ -65,11 +65,15 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
      * @notice Function executed when user creates a Gnosis Safe wallet via GnosisSafeProxyFactory::createProxyWithCallback
      *          setting the registry's address as the callback.
      */
-    function proxyCreated(GnosisSafeProxy proxy, address singleton, bytes calldata initializer, uint256)
-        external
-        override
-    {
-        if (token.balanceOf(address(this)) < PAYMENT_AMOUNT) { // fail early
+    function proxyCreated(
+        GnosisSafeProxy proxy, // @audit notes: created by `GnosisSafeProxyFactory.createProxyWithCallback()` (i.e. `walletFactory`)
+        address singleton, // @audit notes: requires address(`<GnosisSafe>`) (i.e. `masterCopy`)
+        bytes calldata initializer, // @audit notes: an encoded call to `<GnosisSafe>.setup()`
+        uint256
+    ) external override {
+        if (token.balanceOf(address(this)) < PAYMENT_AMOUNT) {
+            // @audit notes: requires gte 10 ETH
+            // fail early
             revert NotEnoughFunds();
         }
 
@@ -86,16 +90,19 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
 
         // Ensure initial calldata was a call to `GnosisSafe::setup`
         if (bytes4(initializer[:4]) != GnosisSafe.setup.selector) {
+            // @audit notes: requires encoded call to `GnosisSafe.setup()`
             revert InvalidInitialization();
         }
 
         // Ensure wallet initialization is the expected
         uint256 threshold = GnosisSafe(walletAddress).getThreshold();
+        // @audit notes: requires eq 1
         if (threshold != EXPECTED_THRESHOLD) {
             revert InvalidThreshold(threshold);
         }
 
         address[] memory owners = GnosisSafe(walletAddress).getOwners();
+        // @audit notes: requires eq 1
         if (owners.length != EXPECTED_OWNERS_COUNT) {
             revert InvalidOwnersCount(owners.length);
         }
@@ -109,10 +116,13 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
             revert OwnerIsNotABeneficiary();
         }
 
+        // @audit notes: requires eq address(0)
         address fallbackManager = _getFallbackManager(walletAddress);
-        if (fallbackManager != address(0))
+        if (fallbackManager != address(0)) {
             revert InvalidFallbackManager(fallbackManager);
+        }
 
+        // @audit notes: it clearly forces that each call must be done with a different `walletOwner`
         // Remove owner as beneficiary
         beneficiaries[walletOwner] = false;
 
@@ -120,16 +130,25 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
         wallets[walletOwner] = walletAddress;
 
         // Pay tokens to the newly created wallet
-        SafeTransferLib.safeTransfer(address(token), walletAddress, PAYMENT_AMOUNT);
+        // @audit notes: not exploitable
+        SafeTransferLib.safeTransfer(
+            address(token),
+            walletAddress,
+            PAYMENT_AMOUNT
+        );
     }
 
-    function _getFallbackManager(address payable wallet) private view returns (address) {
-        return abi.decode(
-            GnosisSafe(wallet).getStorageAt(
-                uint256(keccak256("fallback_manager.handler.address")),
-                0x20
-            ),
-            (address)
-        );
+    function _getFallbackManager(
+        address payable wallet
+    ) private view returns (address) {
+        return
+            // @audit notes: requires eq address(0)
+            abi.decode(
+                GnosisSafe(wallet).getStorageAt(
+                    uint256(keccak256("fallback_manager.handler.address")),
+                    0x20
+                ),
+                (address)
+            );
     }
 }

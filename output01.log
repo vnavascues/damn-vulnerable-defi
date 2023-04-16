@@ -1,0 +1,43 @@
+yarn run v1.22.18
+$ yarn hardhat test test/backdoor/backdoor.challenge.js
+$ /home/victor/Work/personal/damn-vulnerable-defi/node_modules/.bin/hardhat test test/backdoor/backdoor.challenge.js
+Compiled 5 Solidity files successfully
+
+
+  [Challenge] Backdoor
+    1) Execution
+    2) "after all" hook for "Execution"
+
+
+  0 passing (2s)
+  2 failing
+
+  1) [Challenge] Backdoor
+       Execution:
+     HardhatError: HH700: Artifact for contract "GnosisSafeProxyAttackerCoordinator" not found. 
+      at Artifacts._handleWrongArtifactForContractName (/home/victor/Work/personal/damn-vulnerable-defi/node_modules/hardhat/src/internal/artifacts.ts:702:11)
+      at Artifacts._getArtifactPathFromFiles (/home/victor/Work/personal/damn-vulnerable-defi/node_modules/hardhat/src/internal/artifacts.ts:827:19)
+      at Artifacts._getArtifactPath (/home/victor/Work/personal/damn-vulnerable-defi/node_modules/hardhat/src/internal/artifacts.ts:507:21)
+      at Artifacts.readArtifact (/home/victor/Work/personal/damn-vulnerable-defi/node_modules/hardhat/src/internal/artifacts.ts:71:26)
+      at getContractFactory (/home/victor/Work/personal/damn-vulnerable-defi/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:99:22)
+      at Context.<anonymous> (/home/victor/Work/personal/damn-vulnerable-defi/test/backdoor/backdoor.challenge.js:75:7)
+
+  2) [Challenge] Backdoor
+       "after all" hook for "Execution":
+
+      AssertionError: expected +0 to equal 1
+      + expected - actual
+
+      -0
+      +1
+      
+      at Context.<anonymous> (test/backdoor/backdoor.challenge.js:92:74)
+      at processTicksAndRejections (node:internal/process/task_queues:96:5)
+      at runNextTicks (node:internal/process/task_queues:65:3)
+      at listOnTimeout (node:internal/timers:528:9)
+      at processTimers (node:internal/timers:502:7)
+
+
+
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.
