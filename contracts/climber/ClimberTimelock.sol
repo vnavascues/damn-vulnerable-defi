@@ -4,15 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./ClimberTimelockBase.sol";
 import {ADMIN_ROLE, PROPOSER_ROLE, MAX_TARGETS, MIN_TARGETS, MAX_DELAY} from "./ClimberConstants.sol";
-import {
-    InvalidTargetsCount,
-    InvalidDataElementsCount,
-    InvalidValuesCount,
-    OperationAlreadyKnown,
-    NotReadyForExecution,
-    CallerNotTimelock,
-    NewDelayAboveMax
-} from "./ClimberErrors.sol";
+import {InvalidTargetsCount, InvalidDataElementsCount, InvalidValuesCount, OperationAlreadyKnown, NotReadyForExecution, CallerNotTimelock, NewDelayAboveMax} from "./ClimberErrors.sol";
 
 /**
  * @title ClimberTimelock
@@ -67,10 +59,12 @@ contract ClimberTimelock is ClimberTimelockBase {
     /**
      * Anyone can execute what's been scheduled via `schedule`
      */
-    function execute(address[] calldata targets, uint256[] calldata values, bytes[] calldata dataElements, bytes32 salt)
-        external
-        payable
-    {
+    function execute(
+        address[] calldata targets,
+        uint256[] calldata values,
+        bytes[] calldata dataElements,
+        bytes32 salt
+    ) external payable {
         if (targets.length <= MIN_TARGETS) {
             revert InvalidTargetsCount();
         }
@@ -85,13 +79,16 @@ contract ClimberTimelock is ClimberTimelockBase {
 
         bytes32 id = getOperationId(targets, values, dataElements, salt);
 
-        for (uint8 i = 0; i < targets.length;) {
+        for (uint8 i = 0; i < targets.length; ) {
+            // @audit notes: possible attack to call UUPS-upgradeable functions and/or withdrawal ones
             targets[i].functionCallWithValue(dataElements[i], values[i]);
             unchecked {
                 ++i;
             }
         }
 
+        // @audit bad checks-effects-interactions execution. This should be placed
+        // before the external call
         if (getOperationState(id) != OperationState.ReadyForExecution) {
             revert NotReadyForExecution(id);
         }
