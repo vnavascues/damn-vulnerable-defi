@@ -48,7 +48,10 @@ describe("[Challenge] Backdoor", function () {
   it("Execution", async function () {
     /** CODE YOUR SOLUTION HERE */
     await (
-      await ethers.getContractFactory("GnosisSafeProxyAttacker", player)
+      await ethers.getContractFactory(
+        "contracts/backdoor/GnosisSafeProxyAttacker.sol:GnosisSafeProxyAttacker",
+        player
+      )
     ).deploy(
       masterCopy.address,
       walletFactory.address,
